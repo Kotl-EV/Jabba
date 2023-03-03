@@ -3,7 +3,6 @@ package mcp.mobius.betterbarrels.common.blocks;
 import java.util.ArrayList;
 import java.util.List;
 
-import cpw.mods.fml.common.Optional;
 import mcp.mobius.betterbarrels.BetterBarrels;
 import mcp.mobius.betterbarrels.ServerTickHandler;
 import mcp.mobius.betterbarrels.Utils;
@@ -44,7 +43,7 @@ import cpw.mods.fml.common.FMLCommonHandler;
 import cpw.mods.fml.common.network.NetworkRegistry.TargetPoint;
 import cpw.mods.fml.relauncher.Side;
 
-@Optional.Interface(iface = "powercrystals.minefactoryreloaded.api.IDeepStorageUnit", modid = "MineFactoryReloaded")
+
 public class TileEntityBarrel extends TileEntity implements ISidedInventory, IDeepStorageUnit {
 	private static int version = 5;
 
@@ -669,10 +668,10 @@ public class TileEntityBarrel extends TileEntity implements ISidedInventory, IDe
 	public ItemStack decrStackSize(int islot, int quantity) {
 		TileEntity ent = this.worldObj.getTileEntity(this.xCoord, this.yCoord - 1, this.zCoord);
 		ItemStack stack;
-        //TODO Kotl Remove Code fix dupe
-        /*if (ent instanceof TileEntityHopper) {
-			stack = this.getStorage().decrStackSize_Hopper(islot, quantity);
-		} else */ if (ent == null) { // not a tile ent, check if a minecart hopper
+		//if (ent instanceof TileEntityHopper) {
+			//stack = this.getStorage().decrStackSize_Hopper(islot, quantity);
+		//} else
+			if (ent == null) { // not a tile ent, check if a minecart hopper
 			if (aabbBlockBelow == null) {
 				aabbBlockBelow = AxisAlignedBB.getBoundingBox(xCoord, yCoord - 1, zCoord, xCoord + 1, yCoord, zCoord + 1);
 			}

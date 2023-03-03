@@ -336,9 +336,6 @@ public class StorageLocal implements IBarrelStorage {
 
 	@Override
 	public ItemStack decrStackSize(int slot, int quantity) {
-		if (slot == 0)
-			throw new RuntimeException("[JABBA] Tried to decr the stack size of the input slot");
-
 		ItemStack stack = this.outputStack.copy();
 		int stackSize = Math.min(quantity, stack.stackSize);
 		stack.stackSize = stackSize;
@@ -350,9 +347,6 @@ public class StorageLocal implements IBarrelStorage {
 
 	@Override
 	public ItemStack decrStackSize_Hopper(int slot, int quantity) {
-		if (slot == 0)
-			throw new RuntimeException("[JABBA] Tried to decr the stack size of the input slot");
-
 		ItemStack stack = this.outputStack.copy();
 		int stackSize = Math.min(quantity, stack.stackSize);
 		stack.stackSize = stackSize;
@@ -411,8 +405,7 @@ public class StorageLocal implements IBarrelStorage {
 				prevInputStack = null;
 			} else {
 				// fake stack stuff so the inventory appears full in certain mods that do not support the DSU...
-                if(prevInputStack == null)
-				    inputStack = itemTemplate.copy(); // don't rely upon passed in object
+				inputStack = itemTemplate.copy(); // don't rely upon passed in object
 				inputStack.stackSize = stackAmount - (totalCapacity - totalAmount);
 				prevInputStack = inputStack.copy();
 			}

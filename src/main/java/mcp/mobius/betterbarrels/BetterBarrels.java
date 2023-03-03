@@ -1,15 +1,17 @@
 package mcp.mobius.betterbarrels;
 
 import java.util.Arrays;
-import java.util.HashSet;
 
-import cpw.mods.fml.common.*;
 import org.apache.logging.log4j.Level;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
+import cpw.mods.fml.common.FMLCommonHandler;
+import cpw.mods.fml.common.FMLLog;
+import cpw.mods.fml.common.Mod;
 import cpw.mods.fml.common.Mod.EventHandler;
 import cpw.mods.fml.common.Mod.Instance;
+import cpw.mods.fml.common.SidedProxy;
 import cpw.mods.fml.common.event.FMLInitializationEvent;
 import cpw.mods.fml.common.event.FMLInterModComms;
 import cpw.mods.fml.common.event.FMLPostInitializationEvent;
@@ -31,10 +33,9 @@ import mcp.mobius.betterbarrels.common.items.upgrades.ItemUpgradeStructural;
 import mcp.mobius.betterbarrels.network.BarrelPacketHandler;
 import net.minecraft.block.Block;
 import net.minecraft.item.Item;
-import net.minecraft.tileentity.TileEntity;
 import net.minecraftforge.common.config.Configuration;
 
-@Mod(modid=BetterBarrels.modid, name=BetterBarrels.modid, version="GRADLETOKEN_VERSION", dependencies="after:Waila;after:NotEnoughItems")
+@Mod(modid=BetterBarrels.modid, name=BetterBarrels.modid, version="1.2.2", dependencies="after:Waila;after:NotEnoughItems")
 public class BetterBarrels {
 
 	private static boolean DEBUG = Boolean.parseBoolean(System.getProperty("mcp.mobius.debugJabba","false"));
@@ -88,11 +89,7 @@ public class BetterBarrels {
 	public static boolean exposeFullStorageSize = false;
 	public static boolean reverseBehaviourClickLeft = false;
 	public static boolean allowOreDictUnification = true;
-	
-	public static boolean renderStackAndText = false;
-	public static float renderDistance = 16F;
-	public static String[] BlacklistedTileEntiyClassNames = new String[] {"ic2.core.block.machine.tileentity.TileEntityNuke"};
-	public static HashSet<Class<? extends TileEntity>> BlacklistedTileEntityClasses = new HashSet<Class<? extends TileEntity>>();
+	public static int allowedMoveChestDistance = 16;
 
 	@EventHandler
 	public void preInit(FMLPreInitializationEvent event) {
@@ -127,16 +124,11 @@ public class BetterBarrels {
 			exposeFullStorageSize = config.getBoolean("exposeFullStorageSize", "experimental", false, "If true, barrels will expose their full contents through the standard MC inventory interfaces. This will allow mods that do not support the DSU to see the full contents of the barrel. *** WARNING *** This will allow mods that do not properly handle inventories to empty out a barrel in one go. Use at your own risk. If you do find such a game breaking mod, please report to that mods' author and ask them to handle inventories better. Otherwise, please enjoy this experimental feature ^_^");
 
 			reverseBehaviourClickLeft = config.getBoolean("reverseBehaviourClickLeft", Configuration.CATEGORY_GENERAL, false, "If true, punching a barrel will remove one item and shift punching a stack.");
-			
+
 			allowOreDictUnification = config.getBoolean("allowOreDictUnification", Configuration.CATEGORY_GENERAL, true, "If true, Jabba will try unificate 'ingot' 'ore' 'dust' and 'nugget' using oredict");
 
-			renderDistance = config.getFloat("renderDistance", Configuration.CATEGORY_GENERAL, 10000f, 0f, 10000f, "Render Distance (square) for stack and text on barrel.");
-			renderStackAndText = config.getBoolean("renderStackAndText", Configuration.CATEGORY_GENERAL, true, "");
+			allowedMoveChestDistance = config.getInt("allowedMoveChestDistance", Configuration.CATEGORY_GENERAL, 16, 0, 999999,"If you set it more than zero it will prevent chest moving in case if you try to move it by dolly far than you set to this variable in blocks");
 
-			//Blacklisted TileEntities for the Dolly
-			BlacklistedTileEntiyClassNames = config.getStringList("BlacklistedTileEntiyClassNames", Configuration.CATEGORY_GENERAL,	BlacklistedTileEntiyClassNames,
-					"The Canonical Class-Names of TileEntities that should be ignored when using a Dolly.");
-			
 			//fullBarrelTexture  = config.get(Configuration.CATEGORY_GENERAL, "fullBarrelTexture", true).getBoolean(true);
 			//highRezTexture     = config.get(Configuration.CATEGORY_GENERAL, "highRezTexture", false).getBoolean(false);
 			//showUpgradeSymbols = config.get(Configuration.CATEGORY_GENERAL, "showUpgradeSymbols", false).getBoolean(false);
@@ -146,31 +138,6 @@ public class BetterBarrels {
 		} finally {
 			if (config.hasChanged())
 				config.save();
-		}
-		
-		//Process Dolly Blacklist
-		for (String className : BlacklistedTileEntiyClassNames) {
-			Class aClass;
-			try {
-				aClass = Class.forName(className, false, getClass().getClassLoader());
-				if (aClass != null && TileEntity.class.isAssignableFrom(aClass)) {
-					Class<? extends TileEntity> aTileClass = aClass;
-					BlacklistedTileEntityClasses.add(aTileClass);
-					log.log(Level.INFO, "Blacklisted "+className+" from Dolly.");
-				}
-				else {
-					if (aClass == null) {
-						log.log(Level.INFO, "Class "+className+" is Null.");
-						
-					}
-					if (!TileEntity.class.isAssignableFrom(aClass)) {
-						log.log(Level.INFO, "Class "+className+" does not extend TileEntity.");
-					}					
-				}
-			}
-			catch (ClassNotFoundException e) {
-				log.log(Level.INFO, "Did not find "+className+", unable to blacklist from Dolly.");
-			}			
 		}
 
 		proxy.registerEventHandler();
@@ -204,9 +171,7 @@ public class BetterBarrels {
 
 	@EventHandler
 	public void load(FMLInitializationEvent event) {
-		if (!Loader.isModLoaded("dreamcraft")) {
-			RecipeHandler.instance().registerRecipes();
-		}
+		RecipeHandler.instance().registerRecipes();
 		GameRegistry.registerTileEntity(TileEntityBarrel.class, "TileEntityBarrel");
 		FMLCommonHandler.instance().bus().register(ServerTickHandler.INSTANCE);
 		proxy.registerRenderers();
@@ -216,9 +181,7 @@ public class BetterBarrels {
 	@EventHandler
 	public void postInit(FMLPostInitializationEvent event) {
 		RecipeHandler.instance().registerOres();
-		if (!Loader.isModLoaded("dreamcraft")) {
-			RecipeHandler.instance().registerLateRecipes();
-		}
+		RecipeHandler.instance().registerLateRecipes();
 		proxy.postInit();
 	}
 

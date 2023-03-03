@@ -30,7 +30,9 @@ public class RecipeHandler {
 
 		Block CBEnderChest = Block.getBlockFromName("EnderStorage:enderChest");
 		if (CBEnderChest != null) {
-			OreDictionary.registerOre("transdimBlock", new ItemStack(CBEnderChest, 1, OreDictionary.WILDCARD_VALUE));
+			for (int meta=0; meta < 4096; meta++) {
+				OreDictionary.registerOre("transdimBlock", new ItemStack(CBEnderChest, 1, meta));
+			}
 		}
 	}
 

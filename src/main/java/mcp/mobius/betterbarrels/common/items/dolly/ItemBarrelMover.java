@@ -5,9 +5,8 @@ import java.io.DataOutputStream;
 import java.lang.reflect.Method;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 
-import forestry.factory.recipes.MemorizedRecipe;
-import forestry.factory.recipes.RecipeMemory;
 import mcp.mobius.betterbarrels.BetterBarrels;
 import mcp.mobius.betterbarrels.Utils;
 import mcp.mobius.betterbarrels.common.JabbaCreativeTab;
@@ -27,11 +26,12 @@ import net.minecraft.potion.PotionEffect;
 import net.minecraft.tileentity.TileEntity;
 import net.minecraft.tileentity.TileEntityChest;
 import net.minecraft.tileentity.TileEntityMobSpawner;
+import net.minecraft.util.ChatComponentText;
 import net.minecraft.util.IIcon;
+import net.minecraft.util.StatCollector;
 import net.minecraft.util.Vec3;
 import net.minecraft.world.World;
 import net.minecraftforge.common.util.ForgeDirection;
-import forestry.factory.tiles.TileWorktable;
 import cpw.mods.fml.common.FMLCommonHandler;
 import cpw.mods.fml.common.registry.GameData;
 
@@ -56,8 +56,6 @@ public class ItemBarrelMover extends Item {
 		classExtensionsNames.add("buildcraft.energy.TileEngine");
 		classExtensionsNames.add("buildcraft.factory.TileTank");
 
-		//classExtensionsNames.add("ic2.api.energy.tile.IEnergySink");
-		//classExtensionsNames.add("ic2.api.energy.tile.IEnergySource");
 		classExtensionsNames.add("ic2.api.tile.IWrenchable");
 
 		classExtensionsNames.add("mods.railcraft.common.blocks.machine.beta.TileEngine");
@@ -66,14 +64,11 @@ public class ItemBarrelMover extends Item {
 		classExtensionsNames.add("forestry.apiculture.tiles.TileApiaristChest");
 		classExtensionsNames.add("forestry.arboriculture.tiles.TileArboristChest");
 		classExtensionsNames.add("forestry.lepidopterology.tiles.TileLepidopteristChest");
-		classExtensionsNames.add("forestry.factory.tiles.TileWorktable");
 
 		classExtensionsNames.add("bluedart.tile.TileEntityForceEngine");
 
 		classExtensionsNames.add("thermalexpansion.block.engine.TileEngineRoot");
 		classExtensionsNames.add("thermalexpansion.block.machine.TileMachineRoot");
-
-		//classExtensionsNames.add("factorization.common.TileEntityBarrel");
 
 		classExtensionsNames.add("dmillerw.cchests.block.tile.TileChest");
 
@@ -90,7 +85,6 @@ public class ItemBarrelMover extends Item {
 		classExtensionsNames.add("jds.bibliocraft.tileentities.TileEntityWeaponRack");
 		classExtensionsNames.add("jds.bibliocraft.tileentities.TileEntityGenericShelf");
 		classExtensionsNames.add("jds.bibliocraft.tileentities.TileEntityArmorStand");
-		//classExtensionsNames.add("jds.bibliocraft.tileentities.TileEntityWeaponCase");
 
 		classExtensionsNames.add("com.jaquadro.minecraft.storagedrawers.block.tile.TileEntityDrawers");
 		classExtensionsNames.add("com.jaquadro.minecraft.storagedrawers.block.tile.TileEntityCompDrawers");
@@ -98,8 +92,6 @@ public class ItemBarrelMover extends Item {
 		classExtensionsNames.add("com.bluepowermod.tile.TileBase");
 
 		classExtensionsNames.add("com.rwtema.extrautils.tileentity.chests.TileFullChest");
-
-		classExtensionsNames.add("team.chisel.block.tileentity.TileEntityPresent");
 
 		for (String s : classExtensionsNames) {
 			try {
@@ -115,10 +107,35 @@ public class ItemBarrelMover extends Item {
 	public ItemBarrelMover() {
 		super();
 		this.setMaxStackSize(1);
-		//this.setHasSubtypes(true);
-		//this.setMaxDamage(0);
 		this.setCreativeTab(JabbaCreativeTab.tab);
 		this.setNoRepair();
+	}
+
+	public int calculateExcessDistance(int allowedDistance, int x1, int x2, int z1, int z2){
+		int deltaX = Math.abs(x1 - x2);
+		int deltaZ = Math.abs(z1 - z2);
+		int maxDelta = deltaX > deltaZ ? deltaX : deltaZ;
+		return maxDelta - allowedDistance;
+	};
+
+	@Override
+	public void addInformation(ItemStack stack, EntityPlayer player, List list, boolean show) {
+		super.addInformation(stack, player, list, show);
+		if (BetterBarrels.allowedMoveChestDistance > 0 && stack.hasTagCompound() && stack.getTagCompound().hasKey("Container")) {
+			list.add(StatCollector.translateToLocal("item.dolly.normal.allowed_move_distance") + ": " + BetterBarrels.allowedMoveChestDistance);
+			NBTTagCompound nbtContainerStack = stack.getTagCompound().getCompoundTag("Container");
+			String takenFromPlace = StatCollector.translateToLocal("item.dolly.normal.taken_from") + ": ";
+			takenFromPlace += nbtContainerStack.getInteger("posX") + " / " + nbtContainerStack.getInteger("posZ");
+			list.add(takenFromPlace);
+			int excessDistance = calculateExcessDistance(
+					BetterBarrels.allowedMoveChestDistance,
+					(int)player.posX, nbtContainerStack.getInteger("posX"),
+					(int)player.posZ, nbtContainerStack.getInteger("posZ")
+			);
+			if (excessDistance > 0) {
+				list.add("\u00A7c" + StatCollector.translateToLocal("item.dolly.normal.excess_distance") + " " + excessDistance + "\u00A7r");
+			}
+		}
 	}
 
 	@Override
@@ -187,7 +204,23 @@ public class ItemBarrelMover extends Item {
 		}
 		int blockMeta      = nbtContainerStack.getInteger("Meta");
 		String TEClassName = nbtContainerStack.getString("TEClass");
-		NBTTagCompound nbtContainer = nbtStack.getCompoundTag("Container").getCompoundTag("NBT");
+		NBTTagCompound nbtContainer = nbtContainerStack.getCompoundTag("NBT");
+		if (BetterBarrels.allowedMoveChestDistance > 0){
+			int excessDistance = calculateExcessDistance(
+					BetterBarrels.allowedMoveChestDistance,
+					x, nbtContainerStack.getInteger("posX"),
+					z, nbtContainerStack.getInteger("posZ")
+			);
+			if (excessDistance > 0) {
+				player.addChatMessage(
+					new ChatComponentText(
+						StatCollector.translateToLocal("item.dolly.normal.excess_distance_message") +
+							": " + excessDistance
+					)
+				);
+				return false;
+			}
+		}
 
 		ForgeDirection targSide = ForgeDirection.getOrientation(side);
 		//if (world.isBlockSolidOnSide(x, y, z, targSide)) {return false;}
@@ -240,11 +273,10 @@ public class ItemBarrelMover extends Item {
 		if (TEClassName.contains("forestry.energy.gadgets") && nbtContainer.hasKey("Orientation"))
 			nbtContainer.setInteger("Orientation", 1);
 		
-		/* Forestry chests and worktable orientation correction */
+		/* Forestry chests orientation correction */
 		if ((TEClassName.contains("forestry.apiculture.tiles.TileApiaristChest") 
 				|| TEClassName.contains("forestry.arboriculture.tiles.TileArboristChest")
-				|| TEClassName.contains("forestry.lepidopterology.tiles.TileLepidopteristChest")
-				|| TEClassName.contains("forestry.factory.tiles.TileWorktable"))
+				|| TEClassName.contains("forestry.lepidopterology.tiles.TileLepidopteristChest"))
 				&& nbtContainer.hasKey("Orientation"))
 			nbtContainer.setInteger("Orientation", this.getBarrelOrientationOnPlacement(player).ordinal());
 
@@ -296,10 +328,6 @@ public class ItemBarrelMover extends Item {
 		if (TEClassName.contains("com.rwtema.extrautils.tileentity.chests.TileFullChest")) 
 			blockMeta = (this.fromForgeToBiblio(this.getBarrelOrientationOnPlacement(player)) == 3 
 					? 0 : this.fromForgeToBiblio(this.getBarrelOrientationOnPlacement(player)) + 1);
-
-		/* Chisel Present Chest orientation correction */
-		if (TEClassName.contains("team.chisel.block.tileentity.TileEntityPresent") && nbtContainer.hasKey("rotation"))
-			nbtContainer.setInteger("rotation", (byte)this.getBarrelOrientationOnPlacement(player).ordinal());
 
 		//if (TEClassName.contains("jds.bibliocraft.tileentities") && nbtContainer.hasKey("caseAngle"))
 		//	nbtContainer.setInteger("caseAngle", this.fromForgeToBiblio(this.getBarrelOrientationOnPlacement(player)));
@@ -420,8 +448,9 @@ public class ItemBarrelMover extends Item {
 		}
 
 		world.setBlock(targX, targY, targZ, storedBlock, blockMeta, 1 + 2);
+		world.getTileEntity(targX, targY, targZ).readFromNBT(nbtContainer);
+
 		TileEntity entity = world.getTileEntity(targX, targY, targZ);
-		entity.readFromNBT(nbtContainer);
 
 		/* IC2 orientation fix part2 */
 		if (classMap.get("ic2.api.tile.IWrenchable") != null && classMap.get("ic2.api.tile.IWrenchable").isInstance(entity))
@@ -429,18 +458,6 @@ public class ItemBarrelMover extends Item {
 
 		if (TEClassName.contains("net.minecraft.tileentity.TileEntityChest"))
 			world.setBlockMetadataWithNotify(targX, targY, targZ, blockMeta, 1 + 2);
-
-		if (TEClassName.contains("forestry.factory.tiles.TileWorktable")) {
-			// Need to manually rebuild recipe outputs for memorized recipes.
-			// They don't get rebuilt when reading from NBT, for some reason.
-			RecipeMemory recipeMemory = ((TileWorktable) entity).getMemory();
-			for (int i = 0; i < RecipeMemory.capacity; i++) {
-				MemorizedRecipe recipe = recipeMemory.getRecipe(i);
-				if (recipe != null) {
-					recipe.calculateRecipeOutput(world);
-				}
-			}
-		}
 
 		stack.getTagCompound().removeTag("Container");
 
@@ -470,22 +487,10 @@ public class ItemBarrelMover extends Item {
 			return true;
 		if (te instanceof TileEntityChest)
 			return true;
-		if (isTileBlacklisted(te.getClass())) {
-			return false;
-		}
 		for (Class c : classExtensions) {
 			if (c!=null && c.isInstance(te))
 				return true;
 		}
-		return false;
-	}
-	
-	private boolean isTileBlacklisted(Class clazz) {
-		for (Class<? extends TileEntity> tileClass : BetterBarrels.BlacklistedTileEntityClasses) {
-			if (clazz == tileClass) {
-				return true;
-			}
-		}	
 		return false;
 	}
 
@@ -553,6 +558,9 @@ public class ItemBarrelMover extends Item {
 		nbtTarget.setInteger("Meta",      blockMeta);
 		nbtTarget.setString("TEClass",    containerTE.getClass().getName());
 		nbtTarget.setBoolean("isSpawner", containerTE instanceof TileEntityMobSpawner);
+		nbtTarget.setInteger("posX", x);
+		nbtTarget.setInteger("posY", y);
+		nbtTarget.setInteger("posZ", z);
 		nbtTarget.setTag("NBT",   nbtContainer); //TODO: Check this, seems the nbt classes were streamlined somewhat
 
 		if (tagCompoundWrite != null) {
